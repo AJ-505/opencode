@@ -157,6 +157,12 @@ const assistant = (message: SessionMessage.Assistant, model: Model.Ref, provider
   const reasoningInterrupted = message.content.some(
     (item) => item.type === "reasoning" && item.time !== undefined && item.time.completed === undefined,
   )
+  // An errored message lowers its reasoning to plain text, so it has no thinking
+  // block left to precede a tool call. Anthropic rejects a tool_use that is not
+  // preceded by its thinking block when thinking is enabled, so drop the
+  // non-hosted tool calls (and their results) along with the reasoning. Hosted
+  // tools keep their provider-format result payloads and stay replayable.
+  const dropsReasoning = message.error !== undefined && message.content.some((item) => item.type === "reasoning")
   const content = message.content.flatMap((item): ContentPart[] => {
     if (item.type === "text")
       return [
@@ -184,6 +190,7 @@ const assistant = (message: SessionMessage.Assistant, model: Model.Ref, provider
     // Call-side metadata is model-scoped proof of generation (Gemini thought
     // signatures, OpenAI encrypted reasoning): only the producing model may
     // replay it.
+    if (dropsReasoning && item.executed !== true) return []
     const reuseToolProviderMetadata =
       reuseProviderMetadata ||
       (sameModel && item.executed === true && (item.state.status === "completed" || item.state.status === "error"))
@@ -214,7 +221,9 @@ const assistant = (message: SessionMessage.Assistant, model: Model.Ref, provider
     return part.text !== "" || (part.providerMetadata !== undefined && Object.keys(part.providerMetadata).length > 0)
   })
   const results = message.content
-    .filter((item): item is SessionMessage.AssistantTool => item.type === "tool" && item.executed !== true)
+    .filter(
+      (item): item is SessionMessage.AssistantTool => item.type === "tool" && item.executed !== true && !dropsReasoning,
+    )
     .map((item) =>
       toolResult(
         item,

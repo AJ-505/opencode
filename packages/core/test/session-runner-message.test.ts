@@ -1033,6 +1033,81 @@ Earlier work
     ])
   })
 
+  test("drops non-hosted tool calls when a failed message lowers its reasoning to text", () => {
+    const messages = toLLMMessages(
+      [
+        SessionMessage.Assistant.make({
+          id: id("assistant-failed-tools"),
+          type: "assistant",
+          agent: build,
+          model: { id: Model.ID.make("model"), providerID: Provider.ID.make("provider") },
+          content: [
+            SessionMessage.AssistantReasoning.make({
+              type: "reasoning",
+              text: "Partial thought",
+              state: { signature: "sig_failed" },
+              time: { created, completed: created },
+            }),
+            SessionMessage.AssistantTool.make({
+              type: "tool",
+              id: "local-failed",
+              name: "read",
+              executed: false,
+              providerState: { signature: "sig_call" },
+              state: SessionMessage.ToolStateCompleted.make({
+                status: "completed",
+                input: { path: "README.md" },
+                content: [{ type: "text", text: "Hello" }],
+              }),
+              time: { created, completed: created },
+            }),
+            SessionMessage.AssistantTool.make({
+              type: "tool",
+              id: "hosted-failed",
+              name: "web_search",
+              executed: true,
+              providerState: { itemId: "call_hosted" },
+              providerResultState: { itemId: "result_hosted" },
+              state: SessionMessage.ToolStateCompleted.make({
+                status: "completed",
+                input: { query: "Effect" },
+                content: [{ type: "text", text: '{"found":true}' }],
+              }),
+              time: { created, completed: created },
+            }),
+          ],
+          finish: "error",
+          error: { type: "unknown", message: "Step interrupted" },
+          time: { created, completed: created },
+        }),
+      ],
+      model,
+    )
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0]?.content).toEqual([
+      { type: "text", text: "Partial thought" },
+      {
+        type: "tool-call",
+        id: "hosted-failed",
+        name: "web_search",
+        input: { query: "Effect" },
+        providerExecuted: true,
+        providerMetadata: { provider: { itemId: "call_hosted" } },
+      },
+      {
+        type: "tool-result",
+        id: "hosted-failed",
+        name: "web_search",
+        result: { type: "text", value: '{"found":true}' },
+        providerExecuted: true,
+        cache: undefined,
+        metadata: undefined,
+        providerMetadata: { provider: { itemId: "result_hosted" } },
+      },
+    ])
+  })
+
   test("drops unfinished reasoning metadata from an interrupted assistant message", () => {
     const messages = toLLMMessages(
       [
