@@ -24,3 +24,10 @@ const appIDs: Record<string, string> = {
 export const APP_NAME = app.isPackaged ? appNames[CHANNEL] : "OpenCode Dev"
 
 export const APP_ID = app.isPackaged ? appIDs[CHANNEL] : "ai.opencode.desktop.dev"
+
+// Windows groups taskbar icons and toasts by AppUserModelID. An unpackaged run must not
+// share the installed Dev identity: if the installed Dev build is later removed or
+// updated, Windows resolves the group through the stale target and shows a generic
+// document icon for the pinned app.
+// https://github.com/anomalyco/opencode/issues/46473
+export const APP_USER_MODEL_ID = app.isPackaged ? APP_ID : `${APP_ID}.unpackaged`
