@@ -80,12 +80,14 @@ test.each(channels)("channel identity for $channel", ({ channel, appId, feed }) 
   expect(config.deb?.fpm).not.toContain("--rpm-rpmbuild-define=_build_id_links none")
 })
 
-test("legacy Linux launcher stays hidden", async () => {
+test("legacy Linux launcher stays hidden and out of window association", async () => {
   const desktop = await Bun.file(path.join(import.meta.dirname, "resources/linux/opencode-desktop.desktop")).text()
   expect(desktop).toContain("Exec=/opt/OpenCode/ai.opencode %U")
   expect(desktop).toContain("Icon=ai.opencode")
-  expect(desktop).toContain("StartupWMClass=ai.opencode.desktop")
   expect(desktop).toContain("NoDisplay=true")
+  // A second entry claiming the window class makes GNOME link the running window to
+  // this hidden launcher instead of the pinned favorite (anomalyco/opencode#61096).
+  expect(desktop).not.toContain("StartupWMClass")
 })
 
 test.each(channels)("macOS bundle for $channel", ({ channel }) => {

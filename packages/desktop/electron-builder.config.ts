@@ -12,6 +12,10 @@ const packageDir = path.dirname(fileURLToPath(import.meta.url))
 // The Electron 42 packaging update briefly installed Linux launchers/icons under
 // "opencode-desktop". Keep that hidden desktop entry around so existing GNOME/KDE
 // pins still resolve after the canonical app id changes back to ai.opencode.desktop.
+// It must not advertise StartupWMClass: a second entry claiming the same window
+// class makes GNOME link the running window to the hidden launcher instead of the
+// pinned favorite, so the dock shows the pinned icon and a duplicate running one.
+// https://github.com/anomalyco/opencode/issues/61096
 const legacyDesktopEntry = path.join(packageDir, "resources", "linux", "opencode-desktop.desktop")
 
 const legacyDesktopEntryFpm = `${legacyDesktopEntry}=/usr/share/applications/opencode-desktop.desktop`

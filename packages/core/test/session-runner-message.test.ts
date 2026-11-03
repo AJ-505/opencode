@@ -1015,6 +1015,77 @@ Earlier work
     ])
   })
 
+  test("drops non-hosted tool calls when an errored message loses its reasoning", () => {
+    const messages = toLLMMessages(
+      [
+        SessionMessage.Assistant.make({
+          id: id("assistant-failed-local-tools"),
+          type: "assistant",
+          agent: build,
+          model: { id: Model.ID.make("model"), providerID: Provider.ID.make("provider") },
+          content: [
+            SessionMessage.AssistantReasoning.make({
+              type: "reasoning",
+              text: "Partial thought",
+              native: { signature: "sig_failed" },
+            }),
+            SessionMessage.AssistantTool.make({
+              type: "tool",
+              id: "local-failed",
+              name: "read",
+              executed: false,
+              native: { signature: "sig_call" },
+              state: SessionMessage.ToolStateCompleted.make({
+                status: "completed",
+                input: { path: "README.md" },
+                content: [{ type: "text", text: "Hello" }],
+              }),
+              time: { created, completed: created },
+            }),
+            SessionMessage.AssistantTool.make({
+              type: "tool",
+              id: "hosted-failed",
+              name: "web_search",
+              executed: true,
+              native: { itemId: "call_hosted" },
+              state: SessionMessage.ToolStateCompleted.make({
+                status: "completed",
+                input: { query: "Effect" },
+                content: [{ type: "text", text: '{"found":true}' }],
+              }),
+              time: { created, completed: created },
+            }),
+          ],
+          finish: "error",
+          error: { type: "unknown", message: "Step interrupted" },
+          time: { created, completed: created },
+        }),
+      ],
+      model,
+    )
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0]?.content).toEqual([
+      {
+        type: "tool-call",
+        id: "hosted-failed",
+        name: "web_search",
+        input: { query: "Effect" },
+        providerExecuted: true,
+        providerMetadata: { provider: { itemId: "call_hosted" } },
+      },
+      {
+        type: "tool-result",
+        id: "hosted-failed",
+        name: "web_search",
+        result: { type: "text", value: '{"found":true}' },
+        providerExecuted: true,
+        cache: undefined,
+        providerMetadata: { provider: { itemId: "call_hosted" } },
+      },
+    ])
+  })
+
   test("omits unfinished reasoning from an interrupted assistant message", () => {
     const messages = toLLMMessages(
       [
